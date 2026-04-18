@@ -51,10 +51,11 @@ func (g *Graph) migrate() error {
 			return fmt.Errorf("failed to read migration %s: %w", entry.Name(), err)
 		}
 
-		// Execute each statement separately
-		statements := strings.Split(string(content), ";")
-		for _, stmt := range statements {
-			stmt = strings.TrimSpace(stmt)
+		// Execute the full migration as one batch.
+		// We use ExecContext-compatible approach: split on ";\n" at top level
+		// but handle triggers (BEGIN...END) as single statements.
+		stmts := splitSQL(string(content))
+		for _, stmt := range stmts {
 			if stmt == "" {
 				continue
 			}
@@ -71,4 +72,54 @@ func (g *Graph) migrate() error {
 	}
 
 	return nil
+}
+
+// splitSQL splits SQL content into individual statements, correctly handling
+// triggers that contain semicolons inside BEGIN...END blocks.
+func splitSQL(content string) []string {
+	var stmts []string
+	var current strings.Builder
+	inTrigger := false
+
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+
+		// Skip comments and empty lines
+		if strings.HasPrefix(trimmed, "--") || trimmed == "" {
+			if inTrigger {
+				current.WriteString(line)
+				current.WriteString("\n")
+			}
+			continue
+		}
+
+		upper := strings.ToUpper(trimmed)
+
+		// Detect trigger start
+		if strings.Contains(upper, "CREATE TRIGGER") {
+			inTrigger = true
+		}
+
+		current.WriteString(line)
+		current.WriteString("\n")
+
+		if inTrigger {
+			// Trigger ends with "END;"
+			if strings.HasSuffix(upper, "END;") {
+				stmts = append(stmts, strings.TrimSpace(current.String()))
+				current.Reset()
+				inTrigger = false
+			}
+		} else if strings.HasSuffix(trimmed, ";") {
+			stmts = append(stmts, strings.TrimSpace(current.String()))
+			current.Reset()
+		}
+	}
+
+	// Catch any remaining statement
+	if remaining := strings.TrimSpace(current.String()); remaining != "" {
+		stmts = append(stmts, remaining)
+	}
+
+	return stmts
 }
