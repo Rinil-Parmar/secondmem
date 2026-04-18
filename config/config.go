@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Model         ModelConfig         `mapstructure:"model"`
 	OpenAI        OpenAIConfig        `mapstructure:"openai"`
+	Ollama        OllamaConfig        `mapstructure:"ollama"`
 	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledge_base"`
 	Graph         GraphConfig         `mapstructure:"graph"`
 	Git           GitConfig           `mapstructure:"git"`
@@ -23,6 +24,11 @@ type ModelConfig struct {
 type OpenAIConfig struct {
 	APIKey string `mapstructure:"api_key"`
 	Model  string `mapstructure:"model"`
+}
+
+type OllamaConfig struct {
+	URL   string `mapstructure:"url"`
+	Model string `mapstructure:"model"`
 }
 
 type KnowledgeBaseConfig struct {
@@ -60,10 +66,12 @@ func Load(cfgFile string) (*Config, error) {
 		viper.SetConfigType("toml")
 	}
 
-	// Set defaults
-	viper.SetDefault("model.provider", "openai")
+	// Set defaults — Ollama is the default (no API key needed)
+	viper.SetDefault("model.provider", "ollama")
 	viper.SetDefault("openai.api_key", "")
 	viper.SetDefault("openai.model", "gpt-4o")
+	viper.SetDefault("ollama.url", "http://localhost:11434")
+	viper.SetDefault("ollama.model", "llama3.2")
 	viper.SetDefault("knowledge_base.path", filepath.Join(DefaultBasePath(), "knowledge"))
 	viper.SetDefault("knowledge_base.max_file_lines", 1116)
 	viper.SetDefault("knowledge_base.auto_rebalance", true)

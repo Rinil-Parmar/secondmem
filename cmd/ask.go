@@ -7,7 +7,6 @@ import (
 	"github.com/Rinil-Parmar/secondmem/agent"
 	"github.com/Rinil-Parmar/secondmem/config"
 	"github.com/Rinil-Parmar/secondmem/graph"
-	"github.com/Rinil-Parmar/secondmem/providers"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +36,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	provider, err := providers.NewOpenAIProvider(cfg.OpenAI.APIKey, cfg.OpenAI.Model)
+	provider, err := newProvider(cfg)
 	if err != nil {
 		return err
 	}

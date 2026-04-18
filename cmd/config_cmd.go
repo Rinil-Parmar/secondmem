@@ -25,10 +25,14 @@ var configShowCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Provider:       %s\n", cfg.Model.Provider)
+		fmt.Printf("Ollama URL:     %s\n", cfg.Ollama.URL)
+		fmt.Printf("Ollama Model:   %s\n", cfg.Ollama.Model)
 		fmt.Printf("OpenAI Model:   %s\n", cfg.OpenAI.Model)
 		apiKey := cfg.OpenAI.APIKey
 		if len(apiKey) > 8 {
 			apiKey = apiKey[:4] + "..." + apiKey[len(apiKey)-4:]
+		} else if apiKey == "" {
+			apiKey = "(not set)"
 		}
 		fmt.Printf("OpenAI API Key: %s\n", apiKey)
 		fmt.Printf("Knowledge Path: %s\n", cfg.KnowledgeBase.Path)

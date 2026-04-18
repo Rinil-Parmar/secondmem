@@ -52,7 +52,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	configPath := filepath.Join(basePath, "config.toml")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		configContent := `[model]
-provider = "openai"
+provider = "ollama"
+
+[ollama]
+url = "http://localhost:11434"
+model = "llama3.2"
 
 [openai]
 api_key = ""
@@ -112,10 +116,15 @@ _No topics yet. Use 'secondmem ingest' to add knowledge._
 
 	fmt.Println("\nsecondmem initialized successfully!")
 	fmt.Println("\nNext steps:")
-	fmt.Println("  1. Set your OpenAI API key:")
-	fmt.Println("     secondmem config set openai.api_key sk-...")
+	fmt.Println("  1. Make sure Ollama is running locally:")
+	fmt.Println("     ollama serve")
+	fmt.Println("     ollama pull llama3.2")
 	fmt.Println("  2. Start ingesting knowledge:")
 	fmt.Println("     secondmem ingest \"Your text here\"")
+	fmt.Println("")
+	fmt.Println("  (Optional) Use OpenAI instead:")
+	fmt.Println("     secondmem config set model.provider openai")
+	fmt.Println("     secondmem config set openai.api_key sk-...")
 
 	return nil
 }
