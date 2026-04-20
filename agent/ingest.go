@@ -23,46 +23,65 @@ func Ingest(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, 
 		return fmt.Errorf("content is empty")
 	}
 
+	// Step 1: Exact dedup via SHA256
+	if !opts.Force {
+		dup, err := CheckExactDuplicate(cfg.KnowledgeBase.Path, content)
+		if err == nil && dup.IsDuplicate {
+			fmt.Printf("Duplicate detected (exact match): %s\nSkipping. Use --force to override.\n", dup.ExistingFile)
+			return nil
+		}
+	}
+
 	// Load skill.md
 	skillPrompt, err := LoadSkill(cfg)
 	if err != nil {
-		fmt.Println("Warning: could not load skill.md, using defaults")
 		skillPrompt = "You are a knowledge management agent."
 	}
 
-	// Classify content
+	// Step 2: Classify content
 	fmt.Println("Classifying content...")
 	result, err := Classify(provider, skillPrompt, content)
 	if err != nil {
 		return fmt.Errorf("classification failed: %w", err)
 	}
 
-	fmt.Printf("  Topic: %s\n", result.Directory)
-	fmt.Printf("  File:  %s.md\n", result.Filename)
+	fmt.Printf("  Topic:    %s\n", result.Directory)
+	fmt.Printf("  File:     %s.md\n", result.Filename)
 	fmt.Printf("  Keywords: %s\n", strings.Join(result.Keywords, ", "))
 
-	// Ensure directory exists
+	// Step 3: Semantic dedup — check graph FTS for similar content
+	if !opts.Force && g != nil {
+		candidates, err := buildSemanticCandidates(cfg.KnowledgeBase.Path, g, strings.Join(result.Keywords, " "))
+		if err == nil && len(candidates) > 0 {
+			semDup, err := CheckSemanticDuplicate(provider, content, candidates)
+			if err == nil && semDup.IsDuplicate {
+				fmt.Printf("Duplicate detected (semantic ~%d%% overlap). Skipping. Use --force to override.\n", semDup.SimilarityPct)
+				return nil
+			}
+		}
+	}
+
+	// Step 4: Write knowledge file
 	dirPath := filepath.Join(cfg.KnowledgeBase.Path, result.Directory)
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dirPath, err)
 	}
 
-	// Write knowledge file
 	filePath := filepath.Join(dirPath, result.Filename+".md")
 	if err := writeKnowledgeFile(filePath, result, content); err != nil {
 		return fmt.Errorf("failed to write knowledge file: %w", err)
 	}
-	fmt.Printf("  Written to: %s\n", filePath)
+	fmt.Printf("  Written:  %s\n", filePath)
 
-	// Update hierarchy files
+	// Step 5: Update hierarchy files
 	if err := UpdateHierarchy(cfg.KnowledgeBase.Path, result.Directory); err != nil {
-		fmt.Printf("  Warning: failed to update directory hierarchy: %v\n", err)
+		fmt.Printf("  Warning: failed to update hierarchy: %v\n", err)
 	}
 	if err := UpdateRootHierarchy(cfg.KnowledgeBase.Path); err != nil {
 		fmt.Printf("  Warning: failed to update root hierarchy: %v\n", err)
 	}
 
-	// Update graph
+	// Step 6: Update graph
 	if g != nil {
 		relPath, _ := filepath.Rel(cfg.KnowledgeBase.Path, filePath)
 		lineCount := strings.Count(readFileContent(filePath), "\n") + 1
@@ -79,7 +98,6 @@ func Ingest(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, 
 		if err != nil {
 			fmt.Printf("  Warning: failed to update graph: %v\n", err)
 		} else {
-			// Create edges to related topics
 			for _, related := range result.RelatedTopics {
 				nodes, err := g.Search(related, 1)
 				if err == nil && len(nodes) > 0 {
@@ -94,24 +112,41 @@ func Ingest(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, 
 	return nil
 }
 
+// buildSemanticCandidates reads top FTS matches and returns their file contents.
+func buildSemanticCandidates(knowledgePath string, g *graph.Graph, keywords string) ([]string, error) {
+	nodes, err := g.Search(keywords, 3)
+	if err != nil || len(nodes) == 0 {
+		return nil, err
+	}
+	var candidates []string
+	for _, n := range nodes {
+		data, err := os.ReadFile(filepath.Join(knowledgePath, n.FilePath))
+		if err == nil {
+			candidates = append(candidates, string(data))
+		}
+	}
+	return candidates, nil
+}
+
 // writeKnowledgeFile creates or appends to a knowledge markdown file.
+// Embeds SHA256 hash of original content for exact dedup checks.
 func writeKnowledgeFile(filePath string, result *ClassificationResult, originalContent string) error {
 	timestamp := time.Now().Format("2006-01-02 15:04")
 
-	// Truncate original content for source reference
 	source := originalContent
 	if len(source) > 200 {
 		source = source[:200] + "..."
 	}
 
-	entry := fmt.Sprintf("\n## Entry — %s\n\n%s\n\n**Source:** %s\n**Keywords:** %s\n",
+	entry := fmt.Sprintf("\n## Entry — %s\n\n%s\n\n**Source:** %s\n**Keywords:** %s\n**Hash:** %s\n",
 		timestamp,
 		result.Summary,
 		source,
 		strings.Join(result.Keywords, ", "),
+		SHA256HashForFile(originalContent),
 	)
 
-	// If file exists, append
+	// Append to existing file
 	if _, err := os.Stat(filePath); err == nil {
 		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
