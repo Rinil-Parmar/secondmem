@@ -105,6 +105,12 @@ func Ingest(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, 
 				}
 			}
 			fmt.Println("  Graph updated")
+
+			// Step 7: Bidirectional cross-references
+			relPath, _ := filepath.Rel(cfg.KnowledgeBase.Path, filePath)
+			if err := UpdateCrossRefs(cfg, provider, g, relPath); err != nil {
+				fmt.Printf("  Warning: cross-ref update failed: %v\n", err)
+			}
 		}
 	}
 

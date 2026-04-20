@@ -137,9 +137,19 @@ func (g *Graph) Search(query string, limit int) ([]Node, error) {
 		limit = 5
 	}
 
-	// Escape and prepare FTS query — use OR for broader matching
+	// Strip commas and special FTS chars, build prefix OR query
+	query = strings.ReplaceAll(query, ",", " ")
+	query = strings.ReplaceAll(query, `"`, " ")
 	tokens := strings.Fields(query)
-	ftsQuery := strings.Join(tokens, " OR ")
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+	// Prefix match (transformer* matches transformers) for broader recall
+	quoted := make([]string, len(tokens))
+	for i, t := range tokens {
+		quoted[i] = t + "*"
+	}
+	ftsQuery := strings.Join(quoted, " OR ")
 
 	rows, err := g.db.Query(`
 		SELECT n.id, n.file_path, n.directory, n.title, n.summary, n.keywords, n.tags, n.node_type, n.line_count
