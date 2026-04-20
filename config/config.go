@@ -79,7 +79,7 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("ollama.url", "http://localhost:11434")
 	viper.SetDefault("ollama.model", "llama3.2")
 	viper.SetDefault("copilot.github_token", "")
-	viper.SetDefault("copilot.model", "claude-haiku-4-5")
+	viper.SetDefault("copilot.model", "gpt-4o-mini")
 	viper.SetDefault("knowledge_base.path", filepath.Join(DefaultBasePath(), "knowledge"))
 	viper.SetDefault("knowledge_base.max_file_lines", 1116)
 	viper.SetDefault("knowledge_base.auto_rebalance", true)

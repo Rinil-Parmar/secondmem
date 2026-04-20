@@ -80,8 +80,12 @@ var configSetCmd = &cobra.Command{
 
 		// Mask sensitive values in output
 		displayValue := value
-		if strings.Contains(key, "api_key") && len(value) > 8 {
-			displayValue = value[:4] + "..." + value[len(value)-4:]
+		sensitiveKeys := []string{"api_key", "token", "secret", "password"}
+		for _, sk := range sensitiveKeys {
+			if strings.Contains(key, sk) && len(value) > 8 {
+				displayValue = value[:4] + "..." + value[len(value)-4:]
+				break
+			}
 		}
 
 		if err := viper.WriteConfig(); err != nil {

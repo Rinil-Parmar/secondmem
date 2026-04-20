@@ -4,23 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
 )
 
 const (
-	copilotTokenURL     = "https://api.github.com/copilot_internal/v2/token"
-	copilotAPIURL       = "https://api.githubcopilot.com"
-	defaultCopilotModel = "claude-haiku-4-5"
+	copilotAPIBaseURL   = "https://api.githubcopilot.com"
+	defaultCopilotModel = "gpt-4o-mini"
 )
 
-// copilotTransport injects VSCode-like headers to mimic a legitimate Copilot client.
-type copilotTransport struct {
-	inner http.RoundTripper
-}
+// copilotTransport injects VSCode-like headers on every request.
+type copilotTransport struct{ inner http.RoundTripper }
 
 func (t *copilotTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", "GitHubCopilot/1.200.0")
@@ -32,92 +30,66 @@ func (t *copilotTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 // CopilotProvider implements LLMProvider using GitHub Copilot.
 type CopilotProvider struct {
-	githubToken  string
-	sessionToken string
-	model        string
-	client       *openai.Client
+	token  string
+	model  string
+	client *openai.Client
 }
 
-type copilotTokenResponse struct {
-	Token string `json:"token"`
+type copilotConfig struct {
+	CopilotTokens map[string]string `json:"copilotTokens"`
 }
 
-// NewCopilotProvider creates a Copilot provider using a GitHub OAuth token.
-// Get token via: gh auth token
-func NewCopilotProvider(githubToken, model string) (*CopilotProvider, error) {
-	if githubToken == "" {
-		return nil, fmt.Errorf("GitHub token required. Run: gh auth token")
+// copilotTokenFromCLI reads the token from ~/.copilot/config.json automatically.
+func copilotTokenFromCLI() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".copilot", "config.json"))
+	if err != nil {
+		return "", fmt.Errorf("Copilot CLI config not found — run: copilot auth login")
+	}
+	var cfg copilotConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return "", fmt.Errorf("failed to parse Copilot CLI config: %w", err)
+	}
+	for _, token := range cfg.CopilotTokens {
+		if token != "" {
+			return token, nil
+		}
+	}
+	return "", fmt.Errorf("no token found in Copilot CLI config — run: copilot auth login")
+}
+
+// NewCopilotProvider creates a Copilot provider.
+// If token is empty, reads automatically from ~/.copilot/config.json.
+func NewCopilotProvider(token, model string) (*CopilotProvider, error) {
+	if token == "" {
+		var err error
+		token, err = copilotTokenFromCLI()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if model == "" {
 		model = defaultCopilotModel
 	}
-	p := &CopilotProvider{
-		githubToken: githubToken,
-		model:       model,
-	}
-	if err := p.refreshClient(); err != nil {
-		return nil, fmt.Errorf("Copilot auth failed: %w", err)
-	}
-	return p, nil
-}
 
-// refreshClient exchanges GitHub token for a short-lived Copilot session token.
-func (p *CopilotProvider) refreshClient() error {
-	req, err := http.NewRequest("GET", copilotTokenURL, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "token "+p.githubToken)
-	req.Header.Set("User-Agent", "GitHubCopilot/1.200.0")
-	req.Header.Set("Editor-Version", "vscode/1.96.0")
-	req.Header.Set("Editor-Plugin-Version", "copilot-chat/0.22.0")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("token exchange failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("token exchange failed (status %d): %s", resp.StatusCode, string(body))
-	}
-
-	var tokenResp copilotTokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return fmt.Errorf("failed to parse token response: %w", err)
-	}
-	if tokenResp.Token == "" {
-		return fmt.Errorf("empty session token received")
-	}
-
-	p.sessionToken = tokenResp.Token
-
-	cfg := openai.DefaultConfig(p.sessionToken)
-	cfg.BaseURL = copilotAPIURL
+	cfg := openai.DefaultConfig(token)
+	cfg.BaseURL = copilotAPIBaseURL
 	cfg.HTTPClient = &http.Client{
 		Transport: &copilotTransport{inner: http.DefaultTransport},
 	}
-	p.client = openai.NewClientWithConfig(cfg)
-	return nil
+
+	return &CopilotProvider{
+		token:  token,
+		model:  model,
+		client: openai.NewClientWithConfig(cfg),
+	}, nil
 }
 
-// Complete sends prompts to Copilot, auto-retries once on auth failure.
+// Complete sends prompts to the Copilot API.
 func (p *CopilotProvider) Complete(systemPrompt, userPrompt string) (string, error) {
-	result, err := p.doCompletion(systemPrompt, userPrompt)
-	if err != nil && isAuthError(err) {
-		if refreshErr := p.refreshClient(); refreshErr != nil {
-			return "", fmt.Errorf("token refresh failed: %w", refreshErr)
-		}
-		result, err = p.doCompletion(systemPrompt, userPrompt)
-	}
-	return result, err
-}
-
-func (p *CopilotProvider) doCompletion(systemPrompt, userPrompt string) (string, error) {
 	resp, err := p.client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
@@ -130,6 +102,9 @@ func (p *CopilotProvider) doCompletion(systemPrompt, userPrompt string) (string,
 		},
 	)
 	if err != nil {
+		if isAuthError(err) {
+			return "", fmt.Errorf("Copilot auth failed — re-run: copilot auth login\n%w", err)
+		}
 		return "", fmt.Errorf("Copilot completion failed: %w", err)
 	}
 	if len(resp.Choices) == 0 {
@@ -143,22 +118,10 @@ func isAuthError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	for _, kw := range []string{"401", "403", "unauthorized", "expired", "invalid token", "authentication"} {
+	for _, kw := range []string{"401", "403", "unauthorized", "expired", "invalid token"} {
 		if strings.Contains(msg, kw) {
 			return true
 		}
 	}
 	return false
-}
-
-// ListCopilotModels returns available Copilot models.
-func ListCopilotModels() []string {
-	return []string{
-		"claude-haiku-4-5",
-		"claude-sonnet-4-5",
-		"gpt-4o",
-		"gpt-4o-mini",
-		"o1-mini",
-		"o3-mini",
-	}
 }

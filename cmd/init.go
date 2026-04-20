@@ -64,7 +64,7 @@ model = "gpt-4o"
 
 [copilot]
 github_token = ""
-model = "claude-haiku-4-5"
+model = "gpt-4o-mini"
 
 [knowledge_base]
 path = "` + filepath.Join(basePath, "knowledge") + `"
