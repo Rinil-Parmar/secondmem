@@ -35,6 +35,14 @@ var configShowCmd = &cobra.Command{
 			apiKey = "(not set)"
 		}
 		fmt.Printf("OpenAI API Key: %s\n", apiKey)
+		copilotToken := cfg.Copilot.GithubToken
+		if len(copilotToken) > 8 {
+			copilotToken = copilotToken[:4] + "..." + copilotToken[len(copilotToken)-4:]
+		} else if copilotToken == "" {
+			copilotToken = "(not set — run: gh auth token)"
+		}
+		fmt.Printf("Copilot Token:  %s\n", copilotToken)
+		fmt.Printf("Copilot Model:  %s\n", cfg.Copilot.Model)
 		fmt.Printf("Knowledge Path: %s\n", cfg.KnowledgeBase.Path)
 		fmt.Printf("Max File Lines: %d\n", cfg.KnowledgeBase.MaxFileLines)
 		fmt.Printf("Auto Rebalance: %v\n", cfg.KnowledgeBase.AutoRebalance)

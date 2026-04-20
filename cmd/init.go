@@ -62,6 +62,10 @@ model = "llama3.2"
 api_key = ""
 model = "gpt-4o"
 
+[copilot]
+github_token = ""
+model = "claude-haiku-4-5"
+
 [knowledge_base]
 path = "` + filepath.Join(basePath, "knowledge") + `"
 max_file_lines = 1116

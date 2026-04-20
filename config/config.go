@@ -12,9 +12,15 @@ type Config struct {
 	Model         ModelConfig         `mapstructure:"model"`
 	OpenAI        OpenAIConfig        `mapstructure:"openai"`
 	Ollama        OllamaConfig        `mapstructure:"ollama"`
+	Copilot       CopilotConfig       `mapstructure:"copilot"`
 	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledge_base"`
 	Graph         GraphConfig         `mapstructure:"graph"`
 	Git           GitConfig           `mapstructure:"git"`
+}
+
+type CopilotConfig struct {
+	GithubToken string `mapstructure:"github_token"`
+	Model       string `mapstructure:"model"`
 }
 
 type ModelConfig struct {
@@ -72,6 +78,8 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("openai.model", "gpt-4o")
 	viper.SetDefault("ollama.url", "http://localhost:11434")
 	viper.SetDefault("ollama.model", "llama3.2")
+	viper.SetDefault("copilot.github_token", "")
+	viper.SetDefault("copilot.model", "claude-haiku-4-5")
 	viper.SetDefault("knowledge_base.path", filepath.Join(DefaultBasePath(), "knowledge"))
 	viper.SetDefault("knowledge_base.max_file_lines", 1116)
 	viper.SetDefault("knowledge_base.auto_rebalance", true)

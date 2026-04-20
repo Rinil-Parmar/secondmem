@@ -14,7 +14,9 @@ func newProvider(cfg *config.Config) (providers.LLMProvider, error) {
 		return providers.NewOllamaProvider(cfg.Ollama.URL, cfg.Ollama.Model), nil
 	case "openai":
 		return providers.NewOpenAIProvider(cfg.OpenAI.APIKey, cfg.OpenAI.Model)
+	case "copilot":
+		return providers.NewCopilotProvider(cfg.Copilot.GithubToken, cfg.Copilot.Model)
 	default:
-		return nil, fmt.Errorf("unknown provider %q. Supported: ollama, openai", cfg.Model.Provider)
+		return nil, fmt.Errorf("unknown provider %q. Supported: ollama, openai, copilot", cfg.Model.Provider)
 	}
 }
