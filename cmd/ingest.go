@@ -9,6 +9,7 @@ import (
 	"github.com/Rinil-Parmar/secondmem/agent"
 	"github.com/Rinil-Parmar/secondmem/config"
 	"github.com/Rinil-Parmar/secondmem/graph"
+	"github.com/Rinil-Parmar/secondmem/parsers"
 	"github.com/spf13/cobra"
 )
 
@@ -40,12 +41,19 @@ func runIngest(cmd *cobra.Command, args []string) error {
 
 		// Check if it's a file path
 		if info, err := os.Stat(input); err == nil && !info.IsDir() {
-			data, err := os.ReadFile(input)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", input, err)
-			}
-			content = string(data)
 			fmt.Printf("Reading from file: %s\n", input)
+			if strings.HasSuffix(strings.ToLower(input), ".pdf") {
+				content, err = parsers.ParsePDFFile(input)
+				if err != nil {
+					return fmt.Errorf("failed to parse PDF: %w", err)
+				}
+			} else {
+				data, err := os.ReadFile(input)
+				if err != nil {
+					return fmt.Errorf("failed to read file %s: %w", input, err)
+				}
+				content = string(data)
+			}
 		} else {
 			content = input
 		}

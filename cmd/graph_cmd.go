@@ -200,10 +200,61 @@ var graphValidateCmd = &cobra.Command{
 	},
 }
 
+var graphConnectionsCmd = &cobra.Command{
+	Use:   "connections [file-path]",
+	Short: "Show connections for a knowledge file",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		query := args[0]
+		cfg, err := config.Load(cfgFile)
+		if err != nil {
+			return err
+		}
+		g, err := graph.Open(cfg.Graph.DBPath)
+		if err != nil {
+			return fmt.Errorf("failed to open graph: %w", err)
+		}
+		defer g.Close()
+
+		// Accept partial path or full relative path
+		var node *graph.Node
+		node, err = g.GetNodeByPath(query)
+		if err != nil || node == nil {
+			// Fall back to FTS search
+			nodes, searchErr := g.Search(query, 1)
+			if searchErr != nil || len(nodes) == 0 {
+				return fmt.Errorf("no node found for %q", query)
+			}
+			node = &nodes[0]
+		}
+
+		fmt.Printf("Connections: %s\n", node.FilePath)
+		fmt.Printf("  Title:    %s\n", node.Title)
+		fmt.Printf("  Keywords: %s\n\n", node.Keywords)
+
+		related, err := g.GetRelated(node.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get connections: %w", err)
+		}
+
+		if len(related) == 0 {
+			fmt.Println("  No connections found.")
+			return nil
+		}
+
+		fmt.Printf("  %d connection(s):\n", len(related))
+		for _, r := range related {
+			fmt.Printf("    %-45s  %s\n", r.FilePath, r.Keywords)
+		}
+		return nil
+	},
+}
+
 func init() {
 	graphCmd.AddCommand(graphStatsCmd)
 	graphCmd.AddCommand(graphSearchCmd)
 	graphCmd.AddCommand(graphRebuildCmd)
 	graphCmd.AddCommand(graphValidateCmd)
+	graphCmd.AddCommand(graphConnectionsCmd)
 	rootCmd.AddCommand(graphCmd)
 }
