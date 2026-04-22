@@ -32,12 +32,15 @@ func Ask(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, que
 		skillPrompt = "You are a knowledge management agent."
 	}
 
+	// Rewrite natural language question into search keywords
+	searchQuery := extractSearchKeywords(provider, skillPrompt, question)
+
 	// Search graph for relevant nodes
 	var contextFiles []string
 	var filePaths []string
 
 	if g != nil {
-		nodes, err := g.Search(question, 5)
+		nodes, err := g.Search(searchQuery, 5)
 		if err == nil && len(nodes) > 0 {
 			// Expand with related nodes
 			seen := make(map[int64]bool)
@@ -105,6 +108,18 @@ func Ask(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, que
 	}
 
 	return answer, nil
+}
+
+// extractSearchKeywords rewrites a natural language question into FTS-friendly keywords.
+// Falls back to the original question if LLM call fails.
+func extractSearchKeywords(provider providers.LLMProvider, skillPrompt, question string) string {
+	prompt := `Extract 5-8 search keywords from this question. Return ONLY the keywords as a comma-separated list, no explanation.
+Question: ` + question
+	result, err := provider.Complete(skillPrompt, prompt)
+	if err != nil || strings.TrimSpace(result) == "" {
+		return question
+	}
+	return strings.TrimSpace(result)
 }
 
 // fallbackHierarchySearch reads hierarchy files to find relevant content.

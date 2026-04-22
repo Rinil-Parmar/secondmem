@@ -137,9 +137,10 @@ func (g *Graph) Search(query string, limit int) ([]Node, error) {
 		limit = 5
 	}
 
-	// Strip commas and special FTS chars, build prefix OR query
+	// Strip FTS5 special chars (commas, quotes, hyphens act as operators)
 	query = strings.ReplaceAll(query, ",", " ")
 	query = strings.ReplaceAll(query, `"`, " ")
+	query = strings.ReplaceAll(query, "-", " ")
 	tokens := strings.Fields(query)
 	if len(tokens) == 0 {
 		return nil, nil
