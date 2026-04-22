@@ -49,9 +49,10 @@ secondmem config set openai.api_key sk-...
 secondmem ingest "Transformers use self-attention to process sequences in parallel, unlike RNNs."
 secondmem ingest path/to/article.txt
 
-# Query your knowledge base
-secondmem ask "What do I know about transformers?"
+# Query your knowledge base — natural language works
+secondmem ask "what skills should I learn for a co-op?"
 secondmem ask "how does deduplication work" --cite
+secondmem ask "transformers vs RNNs"
 
 # Browse and maintain
 secondmem tree
@@ -173,6 +174,14 @@ secondmem ask "authentication patterns"
 5. Update `hierarchy.md` for directory and root
 6. Upsert graph node, create topic edges
 7. LLM identifies related files → bidirectional cross-reference links
+
+**Query pipeline:**
+1. LLM rewrites natural language question into FTS keywords
+2. FTS5 prefix search across title, summary, keywords
+3. Edge traversal expands results to related nodes
+4. Top 7 files read as context
+5. LLM synthesizes answer (with optional `--cite` source paths)
+6. Fallback: hierarchy scan if graph returns no results
 
 **Rebalance (7 steps):**
 1. Split files over 1,116 lines into themed sub-files
