@@ -6,18 +6,19 @@ AI-powered local knowledge management CLI — your second memory.
 
 secondmem is an automated local librarian for your personal knowledge. Pass it anything — a tweet, article, PDF excerpt, or a note from a coding session — and the AI classifies it, summarizes it, and writes it into the right `.md` file in the right folder. Everything stays on your machine as plain, readable markdown.
 
-Built in Go. No cloud. No vector databases. Just files.
+Built in Go. No cloud. No external vector databases. Just files and your LLM provider.
 
 ## Features
 
 - **Smart Ingestion** — AI classifies content into topic-based markdown files automatically
-- **LORE-GRAPH** — SQLite + FTS5 knowledge graph for fast full-text search
+- **RAG Semantic Search** — Embeddings stored in SQLite; `ask` retrieves by meaning, not just keywords
+- **LORE-GRAPH** — SQLite + FTS5 knowledge graph; keyword fallback when no chunks matched
 - **Natural Language Queries** — Ask questions, get synthesized answers with citations
 - **Bidirectional Cross-References** — Related files link to each other automatically
 - **Deduplication** — SHA256 exact match + LLM semantic similarity (>70% threshold)
 - **Auto-Split / Merge** — Files over 1,116 lines are split by theme; duplicates can be merged
 - **7-Step Rebalance** — Maintains hierarchy, dead links, orphans, graph sync, and merge candidates
-- **Three LLM Providers** — Ollama (local, default), OpenAI, GitHub Copilot
+- **Three LLM Providers** — Ollama (local, default), OpenAI, GitHub Copilot — all support embeddings
 - **Local First** — Plain markdown on your filesystem, Git-friendly
 
 ## Installation
@@ -81,11 +82,13 @@ secondmem rebalance
 
 ## Providers
 
-| Provider | Config | Notes |
-|----------|--------|-------|
-| `ollama` | `ollama.url`, `ollama.model` | Default. Requires `ollama serve` locally |
-| `openai` | `openai.api_key`, `openai.model` | GPT-4o default |
-| `copilot` | auto-detected | Reads token from `~/.copilot/config.json` |
+| Provider | Config | LLM model | Embed model |
+|----------|--------|-----------|------------|
+| `ollama` | `ollama.url`, `ollama.model` | `llama3.2` (default) | `nomic-embed-text` |
+| `openai` | `openai.api_key`, `openai.model` | `gpt-4o` | `text-embedding-3-small` |
+| `copilot` | auto-detected from `~/.copilot/config.json` | `gpt-4o-mini` | `text-embedding-3-small` |
+
+All three providers handle both chat completions and embeddings automatically — no separate embedding config needed.
 
 ```bash
 secondmem config set model.provider ollama
@@ -173,15 +176,15 @@ secondmem ask "authentication patterns"
 4. Write/append to `.md` file with hash embedded
 5. Update `hierarchy.md` for directory and root
 6. Upsert graph node, create topic edges
-7. LLM identifies related files → bidirectional cross-reference links
+7. **Chunk content → embed each chunk → store vectors in SQLite** (RAG index)
+8. LLM identifies related files → bidirectional cross-reference links
 
 **Query pipeline:**
-1. LLM rewrites natural language question into FTS keywords
-2. FTS5 prefix search across title, summary, keywords
-3. Edge traversal expands results to related nodes
-4. Top 7 files read as context
-5. LLM synthesizes answer (with optional `--cite` source paths)
-6. Fallback: hierarchy scan if graph returns no results
+1. Embed question → cosine similarity search across all chunk vectors
+2. Top-6 semantically matching chunks used as context
+3. Fallback: LLM rewrites question into FTS keywords → FTS5 prefix search → edge expansion
+4. LLM synthesizes answer (with optional `--cite` source paths)
+5. Last fallback: hierarchy scan if graph returns no results
 
 **Rebalance (7 steps):**
 1. Split files over 1,116 lines into themed sub-files
