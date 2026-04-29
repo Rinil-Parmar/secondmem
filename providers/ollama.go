@@ -85,3 +85,38 @@ func (p *OllamaProvider) Complete(systemPrompt string, userPrompt string) (strin
 
 	return result.Message.Content, nil
 }
+
+type ollamaEmbedRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+}
+
+type ollamaEmbedResponse struct {
+	Embedding []float32 `json:"embedding"`
+}
+
+// Embed converts text to a vector using nomic-embed-text via Ollama.
+func (p *OllamaProvider) Embed(text string) ([]float32, error) {
+	reqBody := ollamaEmbedRequest{Model: "nomic-embed-text", Prompt: text}
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := p.client.Post(p.baseURL+"/api/embeddings", "application/json", bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("ollama embed failed (is Ollama running?): %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama embed status %d: %s", resp.StatusCode, body)
+	}
+
+	var result ollamaEmbedResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	return result.Embedding, nil
+}

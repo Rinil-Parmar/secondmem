@@ -7,6 +7,7 @@ import (
 	"github.com/Rinil-Parmar/secondmem/agent"
 	"github.com/Rinil-Parmar/secondmem/config"
 	"github.com/Rinil-Parmar/secondmem/graph"
+	"github.com/Rinil-Parmar/secondmem/providers"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +42,8 @@ func runAsk(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	embedder, _ := provider.(providers.Embedder)
+
 	var g *graph.Graph
 	if cfg.Graph.Enabled {
 		g, err = graph.Open(cfg.Graph.DBPath)
@@ -51,7 +54,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	answer, err := agent.Ask(cfg, provider, g, question, askCite)
+	answer, err := agent.Ask(cfg, provider, embedder, g, question, askCite)
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ Rules:
 - If multiple sources agree, synthesize them into a single answer`
 
 // Ask queries the knowledge base and returns an AI-synthesized answer.
-func Ask(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, question string, cite bool) (string, error) {
+func Ask(cfg *config.Config, provider providers.LLMProvider, embedder providers.Embedder, g *graph.Graph, question string, cite bool) (string, error) {
 	if strings.TrimSpace(question) == "" {
 		return "", fmt.Errorf("question is empty")
 	}
@@ -32,17 +32,33 @@ func Ask(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, que
 		skillPrompt = "You are a knowledge management agent."
 	}
 
-	// Rewrite natural language question into search keywords
-	searchQuery := extractSearchKeywords(provider, skillPrompt, question)
-
-	// Search graph for relevant nodes
 	var contextFiles []string
 	var filePaths []string
 
-	if g != nil {
+	// Try semantic (vector) search first
+	if embedder != nil && g != nil {
+		qVec, err := embedder.Embed(question)
+		if err == nil {
+			chunks, err := g.SearchByVector(qVec, 6)
+			if err == nil && len(chunks) > 0 {
+				seen := make(map[string]bool)
+				for _, c := range chunks {
+					if seen[c.FilePath] {
+						continue
+					}
+					seen[c.FilePath] = true
+					contextFiles = append(contextFiles, fmt.Sprintf("--- File: %s ---\n%s", c.FilePath, c.Content))
+					filePaths = append(filePaths, c.FilePath)
+				}
+			}
+		}
+	}
+
+	// Fall back to FTS keyword search if no vector results
+	if len(contextFiles) == 0 && g != nil {
+		searchQuery := extractSearchKeywords(provider, skillPrompt, question)
 		nodes, err := g.Search(searchQuery, 5)
 		if err == nil && len(nodes) > 0 {
-			// Expand with related nodes
 			seen := make(map[int64]bool)
 			var allNodes []graph.Node
 			for _, n := range nodes {
@@ -60,8 +76,6 @@ func Ask(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, que
 					}
 				}
 			}
-
-			// Read file contents (limit to top 7)
 			limit := 7
 			if len(allNodes) < limit {
 				limit = len(allNodes)

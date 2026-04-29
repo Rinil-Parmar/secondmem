@@ -18,7 +18,7 @@ type IngestOptions struct {
 }
 
 // Ingest processes content and stores it in the knowledge base.
-func Ingest(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, content string, opts IngestOptions) error {
+func Ingest(cfg *config.Config, provider providers.LLMProvider, embedder providers.Embedder, g *graph.Graph, content string, opts IngestOptions) error {
 	if strings.TrimSpace(content) == "" {
 		return fmt.Errorf("content is empty")
 	}
@@ -106,7 +106,12 @@ func Ingest(cfg *config.Config, provider providers.LLMProvider, g *graph.Graph, 
 			}
 			fmt.Println("  Graph updated")
 
-			// Step 7: Bidirectional cross-references
+			// Step 7: Embed and store chunks for semantic search
+			if embedder != nil {
+				embedChunks(g, embedder, nodeID, content)
+			}
+
+			// Step 8: Bidirectional cross-references (was Step 7)
 			relPath, _ := filepath.Rel(cfg.KnowledgeBase.Path, filePath)
 			if err := UpdateCrossRefs(cfg, provider, g, relPath); err != nil {
 				fmt.Printf("  Warning: cross-ref update failed: %v\n", err)
@@ -176,4 +181,41 @@ func readFileContent(path string) string {
 		return ""
 	}
 	return string(data)
+}
+
+// embedChunks splits content into overlapping chunks, embeds each, and stores them.
+func embedChunks(g *graph.Graph, embedder providers.Embedder, nodeID int64, content string) {
+	chunks := chunkText(content, 400, 50)
+	g.DeleteChunksByNode(nodeID)
+	for i, chunk := range chunks {
+		vec, err := embedder.Embed(chunk)
+		if err != nil {
+			fmt.Printf("  Warning: embed chunk %d failed: %v\n", i, err)
+			continue
+		}
+		if err := g.SaveChunk(nodeID, i, chunk, vec); err != nil {
+			fmt.Printf("  Warning: save chunk %d failed: %v\n", i, err)
+		}
+	}
+	fmt.Printf("  Embedded %d chunk(s)\n", len(chunks))
+}
+
+// chunkText splits text into overlapping windows by word count.
+func chunkText(text string, size, overlap int) []string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+	var chunks []string
+	for i := 0; i < len(words); i += size - overlap {
+		end := i + size
+		if end > len(words) {
+			end = len(words)
+		}
+		chunks = append(chunks, strings.Join(words[i:end], " "))
+		if end == len(words) {
+			break
+		}
+	}
+	return chunks
 }

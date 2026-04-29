@@ -113,6 +113,24 @@ func (p *CopilotProvider) Complete(systemPrompt, userPrompt string) (string, err
 	return resp.Choices[0].Message.Content, nil
 }
 
+// Embed converts text to a vector using text-embedding-3-small via the Copilot API.
+func (p *CopilotProvider) Embed(text string) ([]float32, error) {
+	resp, err := p.client.CreateEmbeddings(
+		context.Background(),
+		openai.EmbeddingRequest{
+			Model: openai.SmallEmbedding3,
+			Input: text,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("copilot embed failed: %w", err)
+	}
+	if len(resp.Data) == 0 {
+		return nil, fmt.Errorf("copilot returned no embeddings")
+	}
+	return resp.Data[0].Embedding, nil
+}
+
 func isAuthError(err error) bool {
 	if err == nil {
 		return false

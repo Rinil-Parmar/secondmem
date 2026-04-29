@@ -62,5 +62,11 @@ func Classify(provider providers.LLMProvider, skillPrompt, content string) (*Cla
 			result.Directory, result.Filename, result.Summary)
 	}
 
+	// Strip .md extension if LLM included it
+	result.Filename = strings.TrimSuffix(result.Filename, ".md")
+	// Sanitize: lowercase, replace spaces with dashes
+	result.Filename = strings.ToLower(strings.ReplaceAll(result.Filename, " ", "-"))
+	result.Directory = strings.ToLower(strings.TrimSpace(result.Directory))
+
 	return &result, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/Rinil-Parmar/secondmem/config"
 	"github.com/Rinil-Parmar/secondmem/graph"
 	"github.com/Rinil-Parmar/secondmem/parsers"
+	"github.com/Rinil-Parmar/secondmem/providers"
 	"github.com/spf13/cobra"
 )
 
@@ -79,6 +80,9 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Use provider as embedder if it supports it (Copilot and Ollama both do)
+	embedder, _ := provider.(providers.Embedder)
+
 	// Open graph
 	var g *graph.Graph
 	if cfg.Graph.Enabled {
@@ -90,7 +94,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return agent.Ingest(cfg, provider, g, content, agent.IngestOptions{
+	return agent.Ingest(cfg, provider, embedder, g, content, agent.IngestOptions{
 		Force: ingestForce,
 	})
 }
