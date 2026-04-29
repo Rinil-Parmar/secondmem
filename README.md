@@ -267,6 +267,13 @@ secondmem ask "authentication patterns"
 6. Remove stale graph nodes for deleted files
 7. Rebuild root hierarchy.md
 
+## Further Reading
+
+The RAG implementation in secondmem is documented in the [career-playbook](https://github.com/Rinil-Parmar/career-playbook) knowledge base:
+
+- [RAG deep dive](https://github.com/Rinil-Parmar/career-playbook/blob/main/ai/rag.md) — chunking, embeddings, vector stores, cosine similarity, evaluation
+- [secondmem RAG extension plan](https://github.com/Rinil-Parmar/career-playbook/blob/main/ai/secondmem-rag.md) — full architecture, Go implementation details, build phases
+
 ## License
 
 MIT
