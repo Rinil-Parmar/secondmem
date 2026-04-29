@@ -62,6 +62,78 @@ secondmem validate
 secondmem rebalance
 ```
 
+## How It Works — Real Example
+
+### 1. Ingest anything
+
+```bash
+$ secondmem ingest "RAG (Retrieval Augmented Generation) lets LLMs answer questions using your own documents by embedding chunks into a vector store and retrieving the most semantically similar ones at query time."
+
+Classifying content...
+  Topic:    ai-ml
+  File:     rag-retrieval-augmented-generation.md
+  Keywords: RAG, embeddings, vector store, semantic search, LLM
+  Written:  ~/.secondmem/knowledge/ai-ml/rag-retrieval-augmented-generation.md
+  Embedded 1 chunk(s)
+  Graph updated
+
+Ingestion complete!
+```
+
+Works with files and directories too:
+
+```bash
+secondmem ingest ./notes/system-design.md
+secondmem ingest ./career-playbook/
+```
+
+### 2. See your knowledge tree
+
+```bash
+$ secondmem tree
+
+/home/user/.secondmem/knowledge
+├── ai-ml
+│   ├── co-op-skills-roadmap-2026.md
+│   ├── model-context-protocol-overview.md
+│   ├── rag-retrieval-augmented-generation.md
+│   └── transformers-self-attention-parallel.md
+├── engineering
+│   └── claude-code-session-notes.md
+├── personal
+│   └── career-playbook.md
+└── productivity
+    └── secondmem-cli-commands.md
+```
+
+### 3. Ask questions in natural language
+
+```bash
+$ secondmem ask "how does RAG work?"
+
+RAG works by splitting your documents into chunks, embedding each chunk into a
+vector using an embedding model, and storing those vectors. At query time, your
+question is also embedded and compared against all stored vectors using cosine
+similarity. The most semantically similar chunks are retrieved and sent to the
+LLM as context, which then generates a grounded answer.
+
+$ secondmem ask "what should I learn for co-op?" --cite
+
+Based on your notes, the top skills for co-op roles are:
+1. Python + ML basics — foundation for all AI work
+2. LLM APIs + Prompt Engineering — most co-op AI roles are LLM integration
+3. RAG pipelines — ~80% of enterprise AI projects use RAG
+...
+
+Sources:
+  - ai-ml/co-op-skills-roadmap-2026.md
+  - ai-ml/rag-retrieval-augmented-generation.md
+```
+
+Semantic search means it finds relevant notes even when your question uses different words than what you ingested. Ask about "speeding up training" and it finds your notes on "learning rate scheduling."
+
+---
+
 ## Commands
 
 | Command | Description |
