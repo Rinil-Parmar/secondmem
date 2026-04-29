@@ -1,0 +1,37 @@
+name: secondmem-smoke-tests
+
+tests:
+  - description: Go language basics
+    question: What is Go and what are its key features?
+    expected_keywords:
+      - golang
+      - compiled
+      - statically typed
+      - goroutine
+    min_keywords: 2
+    source_hints:
+      - go/basics.md
+
+  - description: Concurrency model
+    question: How does Go handle concurrency?
+    expected_keywords:
+      - goroutine
+      - channel
+      - concurrent
+    min_keywords: 2
+
+  - description: Knowledge base overview
+    question: What topics are covered in this knowledge base?
+    expected_keywords: []
+    # No keywords required — just verify the system returns a non-empty answer
+
+  - description: Specific fact retrieval
+    question: What is the difference between a slice and an array in Go?
+    expected_keywords:
+      - slice
+      - array
+      - dynamic
+      - fixed
+    min_keywords: 3
+    source_hints:
+      - go/types.md
