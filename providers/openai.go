@@ -48,3 +48,21 @@ func (p *OpenAIProvider) Complete(systemPrompt string, userPrompt string) (strin
 
 	return resp.Choices[0].Message.Content, nil
 }
+
+// Embed converts text to a vector using text-embedding-3-small via the OpenAI API.
+func (p *OpenAIProvider) Embed(text string) ([]float32, error) {
+	resp, err := p.client.CreateEmbeddings(
+		context.Background(),
+		openai.EmbeddingRequest{
+			Model: openai.SmallEmbedding3,
+			Input: text,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("openai embed failed: %w", err)
+	}
+	if len(resp.Data) == 0 {
+		return nil, fmt.Errorf("openai returned no embeddings")
+	}
+	return resp.Data[0].Embedding, nil
+}

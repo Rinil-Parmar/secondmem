@@ -10,12 +10,17 @@ import (
 
 type Config struct {
 	Model         ModelConfig         `mapstructure:"model"`
+	Embed         EmbedConfig         `mapstructure:"embed"`
 	OpenAI        OpenAIConfig        `mapstructure:"openai"`
 	Ollama        OllamaConfig        `mapstructure:"ollama"`
 	Copilot       CopilotConfig       `mapstructure:"copilot"`
 	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledge_base"`
 	Graph         GraphConfig         `mapstructure:"graph"`
 	Git           GitConfig           `mapstructure:"git"`
+}
+
+type EmbedConfig struct {
+	Provider string `mapstructure:"provider"` // ollama, openai, copilot — defaults to ollama
 }
 
 type CopilotConfig struct {
@@ -74,6 +79,7 @@ func Load(cfgFile string) (*Config, error) {
 
 	// Set defaults — Ollama is the default (no API key needed)
 	viper.SetDefault("model.provider", "ollama")
+	viper.SetDefault("embed.provider", "ollama")
 	viper.SetDefault("openai.api_key", "")
 	viper.SetDefault("openai.model", "gpt-4o")
 	viper.SetDefault("ollama.url", "http://localhost:11434")

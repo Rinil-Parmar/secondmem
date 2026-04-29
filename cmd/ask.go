@@ -7,7 +7,6 @@ import (
 	"github.com/Rinil-Parmar/secondmem/agent"
 	"github.com/Rinil-Parmar/secondmem/config"
 	"github.com/Rinil-Parmar/secondmem/graph"
-	"github.com/Rinil-Parmar/secondmem/providers"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +41,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	embedder, _ := provider.(providers.Embedder)
+	embedder := newEmbedder(cfg)
 
 	var g *graph.Graph
 	if cfg.Graph.Enabled {
